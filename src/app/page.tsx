@@ -5,10 +5,10 @@ import * as THREE from 'three';
 
 const ThreeDLandingPage: React.FC = () => {
   const mountRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene>();
-  const rendererRef = useRef<THREE.WebGLRenderer>();
-  const cameraRef = useRef<THREE.PerspectiveCamera>();
-  const modelRef = useRef<THREE.Group>();
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const modelRef = useRef<THREE.Group | null>(null);  
   const [debugInfo, setDebugInfo] = useState<string>('Loading...');
   const [isLoading, setIsLoading] = useState(true);
 
