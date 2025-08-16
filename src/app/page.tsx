@@ -197,9 +197,7 @@ const ForgeManufacturingLanding: React.FC = () => {
         </div>
       </section>
 
-      {/* ================================================================== */}
-      {/* == POPULAR PARTS SECTION - RESTORED & ANIMATED == */}
-      {/* ================================================================== */}
+      {/* Popular Parts Section */}
       <AnimatedSection id="manufacture" className="py-20 px-6 bg-slate-100">
         <div className="max-w-7xl mx-auto">
           <motion.div variants={fadeInUp} className="text-center mb-16">
@@ -255,9 +253,7 @@ const ForgeManufacturingLanding: React.FC = () => {
         </div>
       </AnimatedSection>
       
-      {/* ================================================================== */}
-      {/* == CNC PARTS SECTION - RESTORED & ANIMATED == */}
-      {/* ================================================================== */}
+      {/* CNC Parts Section */}
       <AnimatedSection className="py-20 px-6 bg-gradient-to-br from-indigo-700 to-purple-800">
         <div className="max-w-7xl mx-auto text-center">
           <motion.h2 variants={fadeInUp} className="text-4xl md:text-6xl font-bold text-white mb-8">
@@ -271,7 +267,10 @@ const ForgeManufacturingLanding: React.FC = () => {
             ))}
           </motion.div>
           <motion.div variants={fadeInUp} className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-2xl mx-auto">
-            <p className="text-white text-lg leading-relaxed mb-6">Upload your CAD file, and we'll take care of machining, finishing, and shipping—accurate parts delivered fast, no stress.</p>
+            {/* THIS IS THE CORRECTED LINE */}
+            <p className="text-white text-lg leading-relaxed mb-6">
+              Upload your CAD file, and we&apos;ll take care of machining, finishing, and shipping—accurate parts delivered fast, no stress.
+            </p>
             <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="bg-indigo-500 hover:bg-indigo-400 text-white px-8 py-4 rounded-xl font-semibold inline-flex items-center space-x-2 transition-colors">
               <span>Upload Your Design</span>
             </motion.button>
