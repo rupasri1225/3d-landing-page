@@ -1,361 +1,300 @@
 "use client";
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, Suspense } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, Environment, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
+import { motion, useAnimation } from 'framer-motion';
+import { useInView } from 'react-intersection-observer';
 
-const ThreeDLandingPage: React.FC = () => {
-  const mountRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const modelRef = useRef<THREE.Group | null>(null);  
-  const [debugInfo, setDebugInfo] = useState<string>('Loading...');
-  const [isLoading, setIsLoading] = useState(true);
+// Animation Variants for Framer Motion
+const fadeInUp = {
+  initial: { opacity: 0, y: 40 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeInOut' } },
+};
 
-  // Button click handlers
-  const handleGetStarted = () => {
-    // Option 1: Scroll to a specific section
-    const featuresSection = document.getElementById('features');
-    if (featuresSection) {
-      featuresSection.scrollIntoView({ behavior: 'smooth' });
-    }
-    
-    // Option 2: You could also redirect to a signup/registration page
-    // window.open('https://your-signup-page.com', '_blank');
-    
-    // Option 3: Or show a modal/form (you'd need to implement the modal)
-    // setShowSignupModal(true);
-    
-    console.log('Get Started clicked!');
-  };
+const staggerContainer = {
+  animate: {
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
 
-  const handleLearnMore = () => {
-    // Option 1: Scroll to video section
-    const videoSection = document.getElementById('video');
-    if (videoSection) {
-      videoSection.scrollIntoView({ behavior: 'smooth' });
-    }
-    
-    // Option 2: You could redirect to a detailed information page
-    // window.open('https://your-info-page.com', '_blank');
-    
-    console.log('Learn More clicked!');
-  };
+// Reusable component for scroll-triggered animations
+const AnimatedSection: React.FC<{ children: React.ReactNode; id?: string; className?: string }> = ({ children, id, className }) => {
+  const controls = useAnimation();
+  const [ref, inView] = useInView({
+    triggerOnce: true,
+    threshold: 0.15, // Trigger animation when 15% of the section is visible
+  });
 
   useEffect(() => {
-    if (!mountRef.current) return;
+    if (inView) {
+      controls.start('animate');
+    }
+  }, [controls, inView]);
 
-    // Scene setup
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a0a);
-    sceneRef.current = scene;
+  return (
+    <motion.section
+      id={id}
+      ref={ref}
+      className={className}
+      initial="initial"
+      animate={controls}
+      variants={staggerContainer}
+    >
+      {children}
+    </motion.section>
+  );
+};
 
-    // Camera setup
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 0, 5);
-    cameraRef.current = camera;
+// 3D Model Component
+const MotorModel: React.FC = () => {
+  const meshRef = useRef<THREE.Group>(null);
+  const [model, setModel] = useState<THREE.Group | null>(null);
 
-    // Renderer setup
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    mountRef.current.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
+  useEffect(() => {
+    // This creates a placeholder model
+    const geometry = new THREE.CylinderGeometry(1.2, 1.2, 0.8, 32);
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x8c8c8c, metalness: 0.9, roughness: 0.1, envMapIntensity: 1.5
+    });
+    const cylinder = new THREE.Mesh(geometry, material);
+    const detailGeometry1 = new THREE.TorusGeometry(1.3, 0.1, 8, 16);
+    const detailMaterial = new THREE.MeshStandardMaterial({
+      color: 0x4f46e5, metalness: 0.8, roughness: 0.2
+    });
+    const detail1 = new THREE.Mesh(detailGeometry1, detailMaterial);
+    detail1.position.y = 0.3;
+    const detail2 = new THREE.Mesh(detailGeometry1, detailMaterial);
+    detail2.position.y = -0.3;
+    const holeGeometry = new THREE.CylinderGeometry(0.6, 0.6, 0.9, 16);
+    const holeMaterial = new THREE.MeshStandardMaterial({
+      color: 0x2c2c2c, metalness: 0.3, roughness: 0.8
+    });
+    const hole = new THREE.Mesh(holeGeometry, holeMaterial);
+    const group = new THREE.Group();
+    group.add(cylinder, detail1, detail2, hole);
+    group.scale.setScalar(0.8);
+    setModel(group);
+  }, []);
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
-    scene.add(ambientLight);
+  useFrame((state) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.y += 0.005;
+      meshRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.3) * 0.1;
+    }
+  });
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(5, 5, 5);
-    scene.add(directionalLight);
+  if (!model) return null;
+  return (<group ref={meshRef}><primitive object={model} /></group>);
+};
 
-    const pointLight = new THREE.PointLight(0x00ff88, 0.8, 100);
-    pointLight.position.set(-5, 3, 2);
-    scene.add(pointLight);
+// Loading component
+const LoadingSpinner: React.FC = () => (
+  <div className="flex items-center justify-center h-full">
+    <div className="animate-spin rounded-full h-32 w-32 border-b-4 border-indigo-500"></div>
+  </div>
+);
 
-    // Fallback placeholder model since we don't have the actual GLB file
-    const createPlaceholderModel = () => {
-      console.log('Creating placeholder model');
-      const geometry = new THREE.SphereGeometry(1.5, 64, 64);
-      const material = new THREE.MeshStandardMaterial({
-        color: 0xff6b6b,
-        metalness: 0.8,
-        roughness: 0.2,
-        envMapIntensity: 1
-      });
+// Main component
+const ForgeManufacturingLanding: React.FC = () => {
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [scrolled, setScrolled] = useState<boolean>(false);
 
-      const mesh = new THREE.Mesh(geometry, material);
-      const group = new THREE.Group();
-      group.add(mesh);
-      scene.add(group);
-      modelRef.current = group;
-      setDebugInfo('Interactive 3D Model Loaded');
-      setIsLoading(false);
-    };
-
-    // Create the placeholder model immediately
-    createPlaceholderModel();
-
-    // Animation loop
-    let animationId: number;
-    const animate = () => {
-      animationId = requestAnimationFrame(animate);
-      
-      if (modelRef.current) {
-        modelRef.current.rotation.y += 0.01;
-        modelRef.current.rotation.x = Math.sin(Date.now() * 0.001) * 0.1;
-      }
-      
-      renderer.render(scene, camera);
-    };
-    animate();
-
-    // Handle resize
-    const handleResize = () => {
-      if (!camera || !renderer) return;
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    };
-
-    window.addEventListener('resize', handleResize);
-
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 2000);
+    const handleScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener('scroll', handleScroll);
     return () => {
-      window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(animationId);
-      if (mountRef.current && renderer.domElement) {
-        mountRef.current.removeChild(renderer.domElement);
-      }
-      renderer.dispose();
+      clearTimeout(timer);
+      window.removeEventListener('scroll', handleScroll);
     };
   }, []);
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Hero Section with 3D Model */}
-      <section className="relative h-screen overflow-hidden">
-        <div ref={mountRef} className="absolute inset-0" />
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center flex-col">
-            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-emerald-500 mb-4"></div>
-            <p className="text-emerald-400 text-lg">{debugInfo}</p>
-          </div>
-        )}
-        
-        {/* Hero Content Overlay */}
-        <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center z-10">
-          <div className="text-center max-w-4xl mx-auto px-6">
-            <h1 className="text-6xl md:text-8xl font-bold mb-6 bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-              VIGNAM
-            </h1>
-            <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-2xl mx-auto">
-              Transforming Text into Interactive Scientific Simulations
-            </p>
-            <div className="flex gap-4 justify-center flex-wrap">
-              <button 
-                onClick={handleGetStarted}
-                className="bg-emerald-600 hover:bg-emerald-700 px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 transform hover:scale-105 cursor-pointer"
-              >
-                Get Started
-              </button>
-              <button 
-                onClick={handleLearnMore}
-                className="border border-emerald-600 text-emerald-400 hover:bg-emerald-600 hover:text-white px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 cursor-pointer"
-              >
-                Learn More
-              </button>
+    <div className="min-h-screen bg-slate-50 text-slate-800">
+      {/* Navigation */}
+      <motion.nav
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/90 backdrop-blur-md shadow-sm border-b border-slate-200' : 'bg-transparent'}`}
+      >
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">F</span>
+              </div>
+              <span className="text-xl font-semibold text-slate-900">Forge</span>
+            </div>
+            <div className="hidden md:flex items-center space-x-8">
+              <a href="#manufacture" className="text-slate-700 hover:text-indigo-600 transition-colors">Manufacture</a>
+              <a href="#video" className="text-slate-700 hover:text-indigo-600 transition-colors">Our Process</a>
+              <a href="#contact" className="text-slate-700 hover:text-indigo-600 transition-colors">Get in touch</a>
             </div>
           </div>
         </div>
+      </motion.nav>
 
-        {/* Floating UI Elements */}
-        <div className="absolute top-6 left-6 z-20">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl flex items-center justify-center">
-              <span className="text-xl font-bold">V</span>
+      {/* Hero Section */}
+      <section className="relative min-h-screen pt-20 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-purple-50"></div>
+        <div className="relative z-10 max-w-7xl mx-auto px-6 py-20">
+          <motion.div initial="initial" animate="animate" variants={staggerContainer} className="grid lg:grid-cols-2 gap-12 items-center min-h-[80vh]">
+            {/* Left Content */}
+            <div className="space-y-8">
+              <motion.div variants={fadeInUp}>
+                <h1 className="text-5xl lg:text-7xl font-bold text-slate-900 leading-tight">
+                  Revolutionizing
+                  <br />
+                  Manufacturing with
+                  <br />
+                  Speed and <span className="text-slate-500 italic">Precision</span>
+                </h1>
+              </motion.div>
+              {/* Navigation List */}
+              <motion.div variants={staggerContainer} className="space-y-4 mt-12">
+                {[
+                  { title: 'Custom Brackets', icon: '🔧' }, { title: 'Steel Adapters', icon: '⚙️' },
+                  { title: 'Motor Mounts', icon: '🏭' }, { title: 'Enclosures', icon: '📦' }
+                ].map((item, index) => (
+                  <motion.div key={index} variants={fadeInUp} whileHover={{ scale: 1.03 }} transition={{ type: 'spring', stiffness: 300 }}>
+                    <div className="flex items-center justify-between p-4 bg-white rounded-lg shadow-sm border border-slate-100 hover:shadow-lg transition-shadow cursor-pointer">
+                      <div className="flex items-center space-x-4">
+                        <span className="text-indigo-600 font-mono">0{index + 1}</span>
+                        <span className="font-medium text-slate-900">{item.title}</span>
+                      </div>
+                      <div className="flex space-x-2 items-center">
+                        <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center"><span className="text-xs">{item.icon}</span></div>
+                        <span className="text-slate-400">→</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
             </div>
-            <span className="text-xl font-semibold">Vignam</span>
-          </div>
+            {/* Right Content - 3D Model */}
+            <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8, delay: 0.5, ease: 'easeOut' }} className="relative h-[600px] lg:h-[700px]">
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-3xl"></div>
+              {isLoading ? <LoadingSpinner /> : (
+                <Canvas className="absolute inset-0">
+                  <PerspectiveCamera makeDefault position={[0, 0, 5]} />
+                  <ambientLight intensity={0.4} />
+                  <pointLight position={[10, 10, 10]} intensity={1} />
+                  <pointLight position={[-10, -10, -10]} intensity={0.5} color="#4f46e5" />
+                  <Suspense fallback={null}>
+                    <MotorModel />
+                    <Environment preset="studio" />
+                  </Suspense>
+                  <OrbitControls enableZoom={false} enablePan={false} autoRotate autoRotateSpeed={0.5} />
+                </Canvas>
+              )}
+            </motion.div>
+          </motion.div>
         </div>
-
-        {/* Navigation */}
-        <nav className="absolute top-6 right-6 z-20">
-          <div className="flex space-x-6">
-            <a href="#features" className="text-gray-300 hover:text-emerald-400 transition-colors cursor-pointer">Features</a>
-            <a href="#video" className="text-gray-300 hover:text-emerald-400 transition-colors cursor-pointer">Demo</a>
-            <a href="#contact" className="text-gray-300 hover:text-emerald-400 transition-colors cursor-pointer">Contact</a>
-          </div>
-        </nav>
       </section>
 
+      {/* ================================================================== */}
+      {/* == POPULAR PARTS SECTION - RESTORED & ANIMATED == */}
+      {/* ================================================================== */}
+      <AnimatedSection id="manufacture" className="py-20 px-6 bg-slate-100">
+        <div className="max-w-7xl mx-auto">
+          <motion.div variants={fadeInUp} className="text-center mb-16">
+            <h2 className="text-4xl md:text-6xl font-bold text-slate-900 mb-4">
+              The Most Popular
+              <br />
+              <span className="text-slate-500 italic">Parts</span> We Produce
+            </h2>
+          </motion.div>
+          <div className="grid lg:grid-cols-3 gap-8">
+            {[{
+              title: 'Spherical Joint', specs: { Material: 'Steel, Stainless Steel', 'Load Capacity': 'Up to 10,000 N', Thread: 'M8 to M30' }
+            }, {
+              title: 'Protective Cap', specs: { Material: 'Steel, Rubber', 'Fit Type': 'Snap-on, Threaded', 'Impact Resistance': '10 J' }
+            }].map((part, i) => (
+              <motion.div key={i} variants={fadeInUp} whileHover={{ y: -8 }} transition={{ type: 'spring', stiffness: 300 }} className="bg-white rounded-2xl p-8 shadow-md border border-slate-200/50">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold text-slate-900">{part.title}</h3><span className="text-slate-400">→</span>
+                </div>
+                <div className="space-y-2 text-sm text-slate-600 mb-6">
+                  {Object.entries(part.specs).map(([key, value]) => (
+                    <div key={key} className="flex justify-between"><span className="font-medium text-slate-700">{key}:</span><span>{value}</span></div>
+                  ))}
+                </div>
+              </motion.div>
+            ))}
+            <motion.div variants={fadeInUp} whileHover={{ y: -8 }} transition={{ type: 'spring', stiffness: 300 }} className="bg-indigo-600 rounded-2xl p-8 text-white shadow-lg">
+              <div className="text-center h-full flex flex-col justify-center">
+                <h3 className="text-2xl font-bold mb-4">Drag & Drop<br />Your 3D Design</h3>
+                <div className="my-6">
+                  <div className="w-24 h-24 mx-auto bg-white/20 rounded-2xl flex items-center justify-center mb-4">
+                    <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                  </div>
+                  <p className="text-indigo-100 text-sm font-mono">IGES / STL / FBX / DXF / STEP</p>
+                </div>
+                <button className="w-full bg-white text-indigo-600 py-3 px-6 rounded-xl font-semibold hover:bg-indigo-50 transition-colors">Upload Design</button>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </AnimatedSection>
+      
       {/* Video Section */}
-      <section id="video" className="py-20 px-6">
+      <AnimatedSection id="video" className="py-20 px-6 bg-white">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-              See Vignam in Action
-            </h2>
-            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              Experience how our revolutionary text-to-simulation technology transforms complex scientific concepts into interactive learning experiences.
-            </p>
-          </div>
-          
-          <div className="relative aspect-video bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border border-gray-800">
-            <iframe
-              src="https://www.youtube.com/embed/E1czmX6bjFA?start=10"
-              title="Vignam Text to Simulations Demo"
-              className="w-full h-full"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            ></iframe>
-          </div>
+          <motion.div variants={fadeInUp} className="text-center mb-12">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-slate-900">See Our Process in Action</h2>
+            <p className="text-xl text-slate-600 max-w-3xl mx-auto">From digital design to tangible product, witness the precision and speed of our automated manufacturing.</p>
+          </motion.div>
+          <motion.div variants={fadeInUp} className="relative aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-200">
+            <iframe src="https://www.youtube.com/embed/E1czmX6bjFA?start=10" title="Vignam Text to Simulations Demo" className="w-full h-full" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+          </motion.div>
         </div>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="py-20 px-6 bg-gray-900">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">
-              Revolutionary Features
-            </h2>
-            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              Discover the cutting-edge capabilities that make Vignam the future of scientific education.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: "🧪",
-                title: "Text to Simulation",
-                description: "Transform any scientific concept into an interactive 3D simulation with just text input."
-              },
-              {
-                icon: "🎯",
-                title: "Pre-built Library",
-                description: "Access hundreds of ready-made simulations covering physics, chemistry, biology, and more."
-              },
-              {
-                icon: "⚡",
-                title: "Real-time Physics",
-                description: "Experience accurate physics simulation with real-time calculations and interactions."
-              },
-              {
-                icon: "🎨",
-                title: "Visual Learning",
-                description: "Enhanced understanding through immersive visual representations of complex concepts."
-              },
-              {
-                icon: "🔬",
-                title: "Scientific Accuracy",
-                description: "All simulations are built with scientifically accurate models and calculations."
-              },
-              {
-                icon: "📱",
-                title: "Cross-platform",
-                description: "Access your simulations anywhere, anytime, on any device with seamless synchronization."
-              }
-            ].map((feature, index) => (
-              <div key={index} className="bg-black p-8 rounded-2xl border border-gray-800 hover:border-emerald-600 transition-all duration-300 group">
-                <div className="text-4xl mb-4">{feature.icon}</div>
-                <h3 className="text-2xl font-bold mb-4 group-hover:text-emerald-400 transition-colors">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-400">
-                  {feature.description}
-                </p>
-              </div>
+      </AnimatedSection>
+      
+      {/* ================================================================== */}
+      {/* == CNC PARTS SECTION - RESTORED & ANIMATED == */}
+      {/* ================================================================== */}
+      <AnimatedSection className="py-20 px-6 bg-gradient-to-br from-indigo-700 to-purple-800">
+        <div className="max-w-7xl mx-auto text-center">
+          <motion.h2 variants={fadeInUp} className="text-4xl md:text-6xl font-bold text-white mb-8">
+            Precision <span className="italic text-indigo-200">CNC</span> Parts<br />Shipped as Fast as Tomorrow
+          </motion.h2>
+          <motion.div variants={staggerContainer} className="grid grid-cols-2 md:grid-cols-5 gap-6 my-16">
+            {["", "", "", "", ""].map((_, index) => (
+              <motion.div key={index} variants={fadeInUp} className="bg-white/10 backdrop-blur rounded-2xl p-4 sm:p-6 hover:bg-white/20 transition-colors flex items-center justify-center aspect-square">
+                <svg className="w-16 h-16 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
+          <motion.div variants={fadeInUp} className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-2xl mx-auto">
+            <p className="text-white text-lg leading-relaxed mb-6">Upload your CAD file, and we'll take care of machining, finishing, and shipping—accurate parts delivered fast, no stress.</p>
+            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="bg-indigo-500 hover:bg-indigo-400 text-white px-8 py-4 rounded-xl font-semibold inline-flex items-center space-x-2 transition-colors">
+              <span>Upload Your Design</span>
+            </motion.button>
+          </motion.div>
         </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="py-20 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-8 text-center">
-            {[
-              { number: "10K+", label: "Active Users" },
-              { number: "500+", label: "Simulations" },
-              { number: "50+", label: "Universities" },
-              { number: "99%", label: "Satisfaction Rate" }
-            ].map((stat, index) => (
-              <div key={index} className="group">
-                <div className="text-5xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent group-hover:scale-110 transition-transform duration-300">
-                  {stat.number}
-                </div>
-                <div className="text-gray-400 text-lg">
-                  {stat.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 px-6 bg-gradient-to-r from-emerald-900 to-cyan-900">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            Ready to Transform Learning?
-          </h2>
-          <p className="text-xl text-gray-200 mb-8 max-w-2xl mx-auto">
-            Join thousands of educators and students who are already using Vignam to make science more engaging and accessible.
-          </p>
-          <div className="flex gap-4 justify-center flex-wrap">
-            <button 
-              onClick={handleGetStarted}
-              className="bg-white text-emerald-900 hover:bg-gray-100 px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 transform hover:scale-105 cursor-pointer"
-            >
-              Start Free Trial
-            </button>
-            <button 
-              onClick={() => {
-                // You can customize this action
-                const contactSection = document.getElementById('contact');
-                if (contactSection) {
-                  contactSection.scrollIntoView({ behavior: 'smooth' });
-                }
-              }}
-              className="border border-white text-white hover:bg-white hover:text-emerald-900 px-8 py-4 rounded-full text-lg font-semibold transition-all duration-300 cursor-pointer"
-            >
-              Schedule Demo
-            </button>
-          </div>
-        </div>
-      </section>
-
+      </AnimatedSection>
+      
       {/* Footer */}
-      <footer id="contact" className="py-12 px-6 bg-black border-t border-gray-800">
-        <div className="max-w-6xl mx-auto">
+      <footer id="contact" className="py-12 px-6 bg-slate-900 text-white">
+        <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-4 mb-6 md:mb-0">
-              <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                <span className="text-lg font-bold">V</span>
-              </div>
-              <span className="text-xl font-semibold">Vignam</span>
-            </div>
-            
+            <div className="flex items-center space-x-4 mb-6 md:mb-0"><div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center"><span className="text-lg font-bold">F</span></div><span className="text-xl font-semibold">Forge</span></div>
             <div className="flex space-x-6">
-              <a href="#" className="text-gray-400 hover:text-emerald-400 transition-colors cursor-pointer">Privacy</a>
-              <a href="#" className="text-gray-400 hover:text-emerald-400 transition-colors cursor-pointer">Terms</a>
-              <a href="#" className="text-gray-400 hover:text-emerald-400 transition-colors cursor-pointer">Support</a>
+              <a href="#" className="text-slate-400 hover:text-indigo-400 transition-colors">Privacy</a>
+              <a href="#" className="text-slate-400 hover:text-indigo-400 transition-colors">Terms</a>
+              <a href="#" className="text-slate-400 hover:text-indigo-400 transition-colors">Support</a>
             </div>
           </div>
-          
-          <div className="text-center mt-8 pt-8 border-t border-gray-800">
-            <p className="text-gray-400">© 2024 Vignam. All rights reserved.</p>
-          </div>
+          <div className="text-center mt-8 pt-8 border-t border-slate-800"><p className="text-slate-400">© 2025 Forge Manufacturing. All rights reserved.</p></div>
         </div>
       </footer>
     </div>
   );
 };
 
-export default ThreeDLandingPage;
+export default ForgeManufacturingLanding;
